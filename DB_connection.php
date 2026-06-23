@@ -1,9 +1,9 @@
 <?php  
 
 $sName = "localhost";
-$uName = "u123456789_sms_user";
+$uName = "u895854558_sms_db";
 $pass  = "Schoolofindia@03";
-$db_name = "u123456789_sms_db";
+$db_name = "u895854558_sms_db";
 
 try {
 	$conn = new PDO("mysql:host=$sName;dbname=$db_name", $uName, $pass);

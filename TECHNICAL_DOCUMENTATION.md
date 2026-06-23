@@ -25,9 +25,10 @@
 9. [Frontend & UI](#9-frontend--ui)
 10. [Security Considerations](#10-security-considerations)
 11. [Known Issues & Bugs](#11-known-issues--bugs)
-12. [Deployment Guide — Hostinger](#12-deployment-guide--hostinger)
-13. [Post-Deployment Checklist](#13-post-deployment-checklist)
-14. [Troubleshooting](#14-troubleshooting)
+12. [Local Development Setup](#12-local-development-setup)
+13. [Deployment Guide — Hostinger](#13-deployment-guide--hostinger)
+14. [Post-Deployment Checklist](#14-post-deployment-checklist)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
@@ -769,7 +770,161 @@ Single stylesheet: `css/style.css` (85 lines)
 
 ---
 
-## 12. Deployment Guide — Hostinger
+## 12. Local Development Setup
+
+This section explains how to run the project on your local Windows machine for development and testing.
+
+### 12.1 Install XAMPP
+
+1. Download XAMPP (PHP 8.x version) from [apachefriends.org](https://www.apachefriends.org/)
+2. Run the installer — ensure these components are selected:
+   - ✅ **Apache** (web server)
+   - ✅ **MySQL/MariaDB** (database)
+   - ✅ **PHP** (runtime)
+   - ✅ **phpMyAdmin** (database admin UI)
+3. Install to the default location: `C:\xampp`
+
+### 12.2 Start Services
+
+1. Open **XAMPP Control Panel** (run as Administrator for best results)
+2. Click **Start** next to **Apache** — should turn green
+3. Click **Start** next to **MySQL** — should turn green
+4. If ports conflict (e.g., Skype using port 80), change Apache port in `httpd.conf` or close the conflicting application
+
+### 12.3 Copy Project Files
+
+1. Copy the entire `school-management-system-php` folder into the XAMPP web root:
+   ```
+   C:\xampp\htdocs\school-management-system-php\
+   ```
+2. Alternatively, create a symbolic link from your working directory:
+   ```powershell
+   New-Item -ItemType SymbolicLink -Path "C:\xampp\htdocs\school-management-system-php" -Target "C:\AWS-Certification\school-management\school-management-system-php"
+   ```
+
+### 12.4 Create and Import the Database
+
+1. Open your browser and navigate to `http://localhost/phpmyadmin`
+2. Click **New** in the left sidebar
+3. Enter database name: **`sms_db`**
+4. Set collation to: **`utf8mb4_general_ci`**
+5. Click **Create**
+6. Select the `sms_db` database → click the **Import** tab
+7. Click **Choose File** → select `sms_db.sql` from the project root
+8. Click **Go** — you should see "Import has been successfully finished" with 11 tables created
+
+### 12.5 Verify Database Connection
+
+The default `DB_connection.php` already matches XAMPP defaults — **no changes needed**:
+
+| Setting | Default Value |
+|---------|---------------|
+| Host | `localhost` |
+| Username | `root` |
+| Password | *(empty string)* |
+| Database | `sms_db` |
+
+> ⚠️ **Bug Fix Required:** On line 11 of `DB_connection.php`, change `PDOExeption` to `PDOException` (typo in the original code).
+
+### 12.6 Reset Default Passwords
+
+The SQL dump contains bcrypt-hashed passwords. To set a known password, create a temporary file:
+
+**File:** `C:\xampp\htdocs\school-management-system-php\reset.php`
+
+```php
+<?php
+include "DB_connection.php";
+
+$new_password = "admin123";
+$hashed = password_hash($new_password, PASSWORD_DEFAULT);
+
+// Reset admin password
+$conn->prepare("UPDATE admin SET password = ? WHERE username = 'elias'")->execute([$hashed]);
+
+// Reset teacher passwords
+$conn->prepare("UPDATE teachers SET password = ? WHERE username = 'oliver'")->execute([$hashed]);
+$conn->prepare("UPDATE teachers SET password = ? WHERE username = 'abas'")->execute([$hashed]);
+
+// Reset student passwords
+$conn->prepare("UPDATE students SET password = ?")->execute([$hashed]);
+
+// Reset registrar passwords
+$conn->prepare("UPDATE registrar_office SET password = ?")->execute([$hashed]);
+
+echo "All passwords reset to: $new_password";
+echo "<br><br><strong style='color:red;'>⚠️ DELETE THIS FILE IMMEDIATELY AFTER USE!</strong>";
+?>
+```
+
+1. Visit `http://localhost/school-management-system-php/reset.php`
+2. **Delete `reset.php` immediately after use**
+
+### 12.7 Access the Application
+
+| Page | URL |
+|------|-----|
+| **Homepage** | `http://localhost/school-management-system-php/` |
+| **Login** | `http://localhost/school-management-system-php/login.php` |
+| **phpMyAdmin** | `http://localhost/phpmyadmin` |
+
+### 12.8 Test Login Credentials
+
+After running the password reset script:
+
+| Role | Username | Password |
+|------|----------|----------|
+| Admin | `elias` | `admin123` |
+| Teacher | `oliver` | `admin123` |
+| Teacher | `abas` | `admin123` |
+| Student | `john` | `admin123` |
+| Student | `jo` | `admin123` |
+| Registrar | `james` | `admin123` |
+
+### 12.9 Alternative Local Server Options
+
+| Tool | Pros | Install |
+|------|------|---------|
+| **XAMPP** | Most popular, full-featured, cross-platform | [apachefriends.org](https://www.apachefriends.org/) |
+| **WAMP** | Windows-only, clean UI, easy to manage | [wampserver.com](https://www.wampserver.com/) |
+| **Laragon** | Lightweight, auto virtual hosts, fast startup | [laragon.org](https://laragon.org/) |
+| **Docker** | Containerized, reproducible, team-friendly | See Docker Compose example below |
+
+#### Docker Compose (Optional)
+
+```yaml
+version: '3.8'
+services:
+  web:
+    image: php:8.2-apache
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - db
+  db:
+    image: mariadb:10.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sms_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./sms_db.sql:/docker-entrypoint-initdb.d/sms_db.sql
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: db
+```
+
+Run with: `docker-compose up -d` → access at `http://localhost:8080`
+
+---
+
+## 13. Deployment Guide — Hostinger
 
 ### Step-by-Step Guide to Deploy on Hostinger
 
@@ -1028,7 +1183,7 @@ If you purchased a domain elsewhere:
 
 ---
 
-## 13. Post-Deployment Checklist
+## 14. Post-Deployment Checklist
 
 ### Security Hardening
 
@@ -1086,7 +1241,7 @@ ini_set('error_log', '/home/u123456789/logs/php_errors.log');
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 ### Common Issues on Hostinger
 
